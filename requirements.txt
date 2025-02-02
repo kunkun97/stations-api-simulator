@@ -1,0 +1,8 @@
+Flask==2.0.3
+requests==2.26.0
+APScheduler==3.8.1
+Flask-WTF==0.15.1
+WTForms==2.3.3
+Werkzeug==2.0.3
+MarkupSafe==2.0.1
+pytz==2023.3.post1

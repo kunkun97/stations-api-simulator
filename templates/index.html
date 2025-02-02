@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Stations Server</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Mock Stations Server</h1>
+
+    <div class="settings-box">
+        <h2>Settings</h2>
+        <form method="POST" action="/" id="settingsForm">
+            <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+            <div class="form-group">
+                {{ form.api_endpoint.label }}
+                <input type="text" name="api_endpoint" id="api_endpoint" value="{{ form.api_endpoint.data or session.get('api_endpoint', '') }}" size="100">
+                <ul class="errors" id="api_endpoint_errors">
+                {% if errors and errors.api_endpoint %}
+                    {% for error in errors.api_endpoint %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                {% endif %}
+                </ul>
+            </div>
+            <div class="form-group">
+                {{ form.interval.label }}
+                <input type="number" name="interval" id="interval" value="{{ form.interval.data or session.get('interval', '') }}">
+                <ul class="errors" id="interval_errors">
+                {% if errors and errors.interval %}
+                    {% for error in errors.interval %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                {% endif %}
+                </ul>
+            </div>
+            <hr>
+            <div style="display: flex; justify-content: space-between;">
+                <div class="form-group" style="flex: 0 0 48%;">
+                  {{ form.start_index1.label }}
+                  <input type="number" name="start_index1" value="{{ form.start_index1.data or session.get('start_indices', [0]*6)[0] }}">
+                </div>
+                <div class="form-group" style="flex: 0 0 48%;">
+                  {{ form.start_index2.label }}
+                  <input type="number" name="start_index2" value="{{ form.start_index2.data or session.get('start_indices', [0]*6)[1] }}">
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <div class="form-group" style="flex: 0 0 48%;">
+                  {{ form.start_index3.label }}
+                  <input type="number" name="start_index3" value="{{ form.start_index3.data or session.get('start_indices', [0]*6)[2] }}">
+              </div>
+              <div class="form-group" style="flex: 0 0 48%;">
+                  {{ form.start_index4.label }}
+                  <input type="number" name="start_index4" value="{{ form.start_index4.data or session.get('start_indices', [0]*6)[3] }}">
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <div class="form-group" style="flex: 0 0 48%;">
+                  {{ form.start_index5.label }}
+                  <input type="number" name="start_index5" value="{{ form.start_index5.data or session.get('start_indices', [0]*6)[4] }}">
+              </div>
+              <div class="form-group" style="flex: 0 0 48%;">
+                  {{ form.start_index6.label }}
+                  <input type="number" name="start_index6" value="{{ form.start_index6.data or session.get('start_indices', [0]*6)[5] }}">
+              </div>
+            </div>
+            <input type="submit" name="submit_settings" value="Save Settings">
+            </form>
+    </div>
+
+    <div class="container">
+        {% for i in range(1, 7) %}
+        <div class="box">
+            <h3>Station {{ i }}</h3>
+            <button class="control-button" data-station="station{{ i }}" data-action="{% if job_statuses['station' ~ i] %}stop{% else %}start{% endif %}">
+                {% if job_statuses["station" ~ i] %}Stop{% else %}Start Send Data{% endif %}
+            </button>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            function validateField(field, validationFunc) {
+                const value = field.val();
+                const errorList = field.next('.errors');
+                errorList.empty();
+
+                const validationResult = validationFunc(value);
+                if (validationResult !== true) {
+                    field.addClass('is-invalid');
+                    errorList.append(`<li>${validationResult}</li>`);
+                    return false;
+                } else {
+                    field.removeClass('is-invalid');
+                    return true;
+                }
+            }
+
+            function validateAPIEndpoint(value) {
+                if (!value) return 'This field is required.';
+                try {
+                    new URL(value);
+                    return true;
+                } catch (_) {
+                    return 'Invalid URL format.';
+                }
+            }
+
+            function validateInterval(value) {
+                if (!value) return 'This field is required.';
+                const intValue = parseInt(value);
+                if (isNaN(intValue) || intValue < 1) return 'Interval must be greater than 0.';
+                return true;
+            }
+
+            function updateButtonStates() {
+                const isAPIEndpointValid = validateField($('#api_endpoint'), validateAPIEndpoint);
+                const isIntervalValid = validateField($('#interval'), validateInterval);
+
+                $('.control-button').each(function() {
+                    const button = $(this);
+                    if (button.data('action') === 'start') {
+                        button.prop('disabled', !(isAPIEndpointValid && isIntervalValid));
+                    }
+                });
+            }
+
+            // Initial validation and button states update
+            updateButtonStates();
+
+            // Validation on input change
+            $('#api_endpoint').on('input', () => validateField($('#api_endpoint'), validateAPIEndpoint));
+            $('#interval').on('input', () => validateField($('#interval'), validateInterval));
+
+            // Update button states on any input change
+            $('input').on('input', updateButtonStates);
+
+            // Prevent form submission if validation fails
+            $('#settingsForm').submit(function(event) {
+                const isAPIEndpointValid = validateField($('#api_endpoint'), validateAPIEndpoint);
+                const isIntervalValid = validateField($('#interval'), validateInterval);
+
+                if (!isAPIEndpointValid || !isIntervalValid) {
+                    event.preventDefault(); // Ngăn chặn submit form nếu có lỗi
+                }
+            });
+
+            $('.control-button').click(function() {
+                const station = $(this).data('station');
+                const action = $(this).data('action');
+                const button = $(this);
+
+                $.ajax({
+                    url: `/control/${station}/${action}`,
+                    type: 'GET',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            if (action === 'start') {
+                                button.data('action', 'stop');
+                                button.text('Stop');
+                                button.addClass('stop-button');
+                            } else {
+                                button.data('action', 'start');
+                                button.text('Start Send Data');
+                                button.removeClass('stop-button');
+                            }
+                        } else {
+                            alert('Error: ' + response.message);
+                        }
+                    },
+                    error: function(error) {
+                        alert('An error occurred: ' + error.statusText);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
